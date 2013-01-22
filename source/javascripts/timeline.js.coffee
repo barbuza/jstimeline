@@ -7,14 +7,18 @@ class Timeline
 
   position: 0
   size: 100
+  time: 0
   items: {}
 
   constructor: ->
     @root = $ "<div class='timeline'></div>"
     @times = $ "<div class='times'></div>"
-    @root.append @times
+    @times_handle = $ "<div class='times-handle'></div>"
+    @current = $ "<div class='current'></div>"
+    @root.append @times, @current, @times_handle
     @root.bind "mousedown.move", (e) => @startMoving e
     @root.bind "mousewheel.scale", (e) => @doScale e
+    @times_handle.bind "mousedown.settime", (e) => @setTime e
 
   formatTime: (val) ->
     minutes = Math.floor val / (25 * 60)
@@ -23,12 +27,21 @@ class Timeline
     rest = val - minutes * 28 * 60 - seconds * 25
     minutes = "0#{minutes}" if minutes < 10
     seconds = "0#{seconds}" if seconds < 10
-    msec = ("" + rest * 400).slice(0, 2)
-    return "#{minutes}:#{seconds}.#{msec}"
+    if parseInt minutes
+      "#{minutes}:#{seconds}"
+    else
+      msec = ("" + rest * 400).slice(0, 1)
+      "#{minutes}:#{seconds}.#{msec}"
 
-  @getter "width", -> @root.width()
+  @getter "width", -> @root.width() + 1
   @getter "scale", -> Math.ceil 5 * @size / @width
   @getter "markStep", -> Math.floor @width * @scale / @size
+
+  getShift: (e) -> Math.floor( (e.clientX - @moveStartX) * @size / @width )    
+
+  setTime: (e) ->
+    @time = @screenToValue e.offsetX
+    @redrawCurrentTime()
 
   startMoving: (e) ->
     $(document.body).bind "mouseup.move", (e) => @stopMoving e
@@ -42,8 +55,7 @@ class Timeline
     @root.bind "mousedown.move", (e) => @startMoving e
 
   doMove: (e) ->
-    shift = Math.floor( (e.clientX - @moveStartX) * @size / @width )
-    @position = @moveStartPos + shift
+    @position = @moveStartPos + @getShift(e)
     @position = 0 if @position < 0
     @redraw()
 
@@ -65,33 +77,31 @@ class Timeline
     $(document.body).unbind ".moveitem"
     item.removeClass "move"
 
-  checkSiblings: (item, {size, position}) ->
-    left = position || item.data("position")
-    right = (size || item.data("size")) + left
-    for sibling in item.siblings()
+  trySetItemAttrs: (item, {size, position, siblings}) ->
+    left = position or item.data("position")
+    right = (size or item.data("size")) + left
+    for sibling in (siblings or item.siblings())
       s_left = $(sibling).data "position"
       s_right = $(sibling).data("size") + s_left
       return no if s_left < left < s_right or s_left < right < s_right or left < s_left < right or left < s_right < right
-    yes
+    item.data
+      position: position or item.data("position")
+      size: size or item.data("size")
+    @redraw()
 
   doMoveItem: (item, e) ->
-    shift = Math.floor( (e.clientX - @moveStartX) * @size / @width)
-    if @checkSiblings(item, position: @moveStartPos + shift)
-      item.data "position", @moveStartPos + shift
-      @redraw()
+    @trySetItemAttrs item,
+      position: @moveStartPos + @getShift(e)
 
   doWResizeItem: (item, e) ->
-    shift = Math.floor( (e.clientX - @moveStartX) * @size / @width)
-    if @checkSiblings(item, position: @moveStartPos + shift, size: @moveStartSize - shift)
-      item.data "position", @moveStartPos + shift
-      item.data "size", @moveStartSize - shift
-      @redraw()
+    shift = @getShift e
+    @trySetItemAttrs item,
+      position: @moveStartPos + shift
+      size: @moveStartSize - shift
 
   doEResizeItem: (item, e) ->
-    shift = Math.floor( (e.clientX - @moveStartX) * @size / @width)
-    if @checkSiblings(item, size: @moveStartSize + shift)
-      item.data "size", @moveStartSize + shift
-      @redraw()
+    @trySetItemAttrs item,
+      size: @moveStartSize + @getShift(e)
 
   doScale: (e) ->
     delta = e.originalEvent.wheelDelta
@@ -129,11 +139,22 @@ class Timeline
     for item in @root.find ".row div"
       @redrawItem $ item
     @redrawMarks()
+    @redrawCurrentTime()
+
+  redrawCurrentTime: ->
+    @current.css
+      left: Math.floor (@time - @position) * @markStep / @scale - 1
+      width: if @scale is 1 then @markStep else 1
+      opacity: if @scale is 1 then 0.3 else 1
+
+  valueToScreen: (val) -> Math.floor (val - @position) * @markStep / @scale
+
+  screenToValue: (screen) -> Math.floor screen * @scale / @markStep + @position
 
   redrawItem: (item) ->
     item.css
       "width": Math.floor item.data("size") * @markStep / @scale
-      "left": Math.floor (item.data("position") - @position) * @markStep / @scale
+      "left": @valueToScreen item.data("position")
 
   redrawMarks: ->
     @root.css
@@ -172,6 +193,7 @@ class Timeline
 
 jQuery ->
   t = new Timeline
+  t.time = 32
   t.inject $ document.body
   t.addItem "video", 10, 30, "video1"
   t.addItem "video", 60, 20, "video2"

@@ -9,11 +9,30 @@ body {
 .timeline {
   @include user-select(none);
   border-radius: 2px;
-  width: 800px;
+  width: 999px;
   border: 1px solid #ccc;
   position: relative;
   padding-top: 32px;
+  overflow: hidden;
   background-repeat: repeat-x, no-repeat, repeat-x;
+  .current {
+    position: absolute;
+    left: 0px;
+    top: 0px;
+    height: 100%;
+    width: 0px;
+    background: red;
+    z-index: 3;
+  }
+  .times-handle {
+    position: absolute;
+    width: 100%;
+    top: 0px;
+    left: 0px;
+    height: 18px;
+    z-index: 5;
+    cursor: s-resize;
+  }
   .times {
     overflow: hidden;
     position: absolute;
@@ -21,8 +40,11 @@ body {
     top: 0px;
     left: 0px;
     height: 18px;
+    z-index: 2;
+    background: #fff;
+    cursor: pointer;
     .mark {
-      background: #fff;
+      background: rgba(255, 255, 255, 0.5);
       color: #555;
       opacity: 0.99;
       position: absolute;
@@ -31,6 +53,7 @@ body {
       font-family: Menlo;
       top: 0px;
       padding: 0 4px;
+      z-index: 4;
     }
   }
   .row {
@@ -41,11 +64,12 @@ body {
     div {
       border-radius: 2px;
       background: rgba(120, 120, 120, 0.6);
-      height: 30px;
+      height: 26px;
       position: absolute;
+      top: 2px;
       color: #fff;
       text-align: center;
-      line-height: 30px;
+      line-height: 26px;
       font-family: Menlo;
       font-size: 12px;
       white-space: pre;
