@@ -1,0 +1,60 @@
+@import "compass/reset";
+@import "compass/css3/user-interface";
+@import "compass/css3/images";
+
+body {
+  margin: 50px;
+}
+
+.timeline {
+  @include user-select(none);
+  border-radius: 2px;
+  width: 800px;
+  border: 1px solid #ccc;
+  position: relative;
+  padding-top: 32px;
+  background-repeat: repeat-x, no-repeat, repeat-x;
+  .times {
+    overflow: hidden;
+    position: absolute;
+    width: 100%;
+    top: 0px;
+    left: 0px;
+    height: 18px;
+    .mark {
+      background: #fff;
+      color: #555;
+      opacity: 0.99;
+      position: absolute;
+      line-height: 18px;
+      font-size: 12px;
+      font-family: Menlo;
+      top: 0px;
+      padding: 0 4px;
+    }
+  }
+  .row {
+    height: 30px;
+    border-top: 1px solid #ccc;
+    overflow: hidden;
+    position: relative;
+    .item {
+      border-radius: 2px;
+      background: rgba(120, 120, 120, 0.6);
+      height: 30px;
+      position: absolute;
+      color: #fff;
+      text-align: center;
+      line-height: 30px;
+      font-family: Menlo;
+      font-size: 12px;
+      white-space: pre;
+      text-overflow: ellipsis;
+      overflow: hidden;
+      &:hover {
+        background: rgba(150, 150, 150, 0.6);
+        cursor: move;
+      }
+    }
+  }
+}
