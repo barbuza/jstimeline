@@ -16,7 +16,15 @@ class Timeline
     @root.bind "mousedown.move", (e) => @startMoving e
     @root.bind "mousewheel.scale", (e) => @doScale e
 
-  formatTime: (val) -> val
+  formatTime: (val) ->
+    minutes = Math.floor val / (25 * 60)
+    rest = val - minutes * 25 * 60
+    seconds = Math.floor rest / 25
+    rest = val - minutes * 28 * 60 - seconds * 25
+    minutes = "0#{minutes}" if minutes < 10
+    seconds = "0#{seconds}" if seconds < 10
+    msec = ("" + rest * 400).slice(0, 2)
+    return "#{minutes}:#{seconds}.#{msec}"
 
   @getter "width", -> @root.width()
   @getter "scale", -> Math.ceil 5 * @size / @width
@@ -39,6 +47,52 @@ class Timeline
     @position = 0 if @position < 0
     @redraw()
 
+  startMovingItem: (item, e) ->
+    @moveStartX = e.clientX
+    @moveStartSize = item.data "size"
+    @moveStartPos = item.data "position"
+    $(document.body).bind "mouseup.moveitem", (e) => @stopMovingItem item, e
+    if e.offsetX < 10
+      @root.bind "mousemove.moveitem", (e) => @doWResizeItem item, e
+    else if item.outerWidth() - e.offsetX < 10
+      @root.bind "mousemove.moveitem", (e) => @doEResizeItem item, e
+    else
+      @root.bind "mousemove.moveitem", (e) => @doMoveItem item, e
+    no
+
+  stopMovingItem: (item, e) ->
+    @root.unbind ".moveitem"
+    $(document.body).unbind ".moveitem"
+    item.removeClass "move"
+
+  checkSiblings: (item, {size, position}) ->
+    left = position || item.data("position")
+    right = (size || item.data("size")) + left
+    for sibling in item.siblings()
+      s_left = $(sibling).data "position"
+      s_right = $(sibling).data("size") + s_left
+      return no if s_left < left < s_right or s_left < right < s_right or left < s_left < right or left < s_right < right
+    yes
+
+  doMoveItem: (item, e) ->
+    shift = Math.floor( (e.clientX - @moveStartX) * @size / @width)
+    if @checkSiblings(item, position: @moveStartPos + shift)
+      item.data "position", @moveStartPos + shift
+      @redraw()
+
+  doWResizeItem: (item, e) ->
+    shift = Math.floor( (e.clientX - @moveStartX) * @size / @width)
+    if @checkSiblings(item, position: @moveStartPos + shift, size: @moveStartSize - shift)
+      item.data "position", @moveStartPos + shift
+      item.data "size", @moveStartSize - shift
+      @redraw()
+
+  doEResizeItem: (item, e) ->
+    shift = Math.floor( (e.clientX - @moveStartX) * @size / @width)
+    if @checkSiblings(item, size: @moveStartSize + shift)
+      item.data "size", @moveStartSize + shift
+      @redraw()
+
   doScale: (e) ->
     delta = e.originalEvent.wheelDelta
     if delta < 0
@@ -55,14 +109,24 @@ class Timeline
     @redraw()
 
   createItem: (position, size, name) ->
-    item = $ "<div class='item'>#{name}</div>"
+    item = $ "<div>#{name}</div>"
     item.data "name", name
     item.data "position", position
     item.data "size", size
+    item.bind "mousedown.move", (e) => @startMovingItem item, e
+    item.bind "mousemove.cursor", (e) => @setItemCursor item, e
     item
 
+  setItemCursor: (item, e) ->
+    if e.offsetX < 10
+      item.attr "class", "w-resize"
+    else if item.outerWidth() - e.offsetX < 10
+      item.attr "class", "e-resize"
+    else
+      item.attr "class", "move"
+
   redraw: ->
-    for item in @root.find ".item"
+    for item in @root.find ".row div"
       @redrawItem $ item
     @redrawMarks()
 
@@ -79,7 +143,6 @@ class Timeline
                           "-webkit-linear-gradient(left, #fff, #fff)," +
                           "-webkit-linear-gradient(left, transparent #{@markStep - 1}px, rgba(100, 100, 100, 0.2) 1px)"
     @times.empty()
-    k = 0
     val = 0
     while true
       val += @scale * 10
@@ -114,3 +177,4 @@ jQuery ->
   t.addItem "video", 60, 20, "video2"
   t.addItem "audio", 8, 40, "audio1"
   t.addItem "audio", 61, 20, "audio2"
+  t.addItem "audio", 61, 20, "audio3"
