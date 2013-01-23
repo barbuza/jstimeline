@@ -1,27 +1,35 @@
 @import "compass/reset";
 @import "compass/css3/user-interface";
 @import "compass/css3/images";
+@import "compass/css3/font-face";
+
+@include font-face(segoe, font-files("segoe.ttf", "segoe.woff"));
 
 body {
   margin: 50px;
+  background: #f3f3f3;
 }
 
 .timeline {
   @include user-select(none);
-  border-radius: 2px;
+  border-radius: 3px;
   width: 999px;
+  background: #fff;
   border: 1px solid #ccc;
   position: relative;
   padding-top: 32px;
   overflow: hidden;
   background-repeat: repeat-x, no-repeat, repeat-x;
+  &.move {
+    cursor: move;
+  }
   .current {
     position: absolute;
     left: 0px;
     top: 0px;
     height: 100%;
     width: 0px;
-    background: red;
+    background: rgb(112, 48, 48);
     z-index: 3;
   }
   .times-handle {
@@ -49,8 +57,8 @@ body {
       opacity: 0.99;
       position: absolute;
       line-height: 18px;
-      font-size: 8px;
-      font-family: Menlo;
+      font-size: 10px;
+      font-family: segoe;
       top: 0px;
       padding: 0 4px;
       z-index: 4;
@@ -61,22 +69,40 @@ body {
     border-top: 1px solid #ccc;
     overflow: hidden;
     position: relative;
+    &.video {
+      div {
+        background: #998A6F;
+        color: #F5DDB1;
+      }
+    }
+    &.audio {
+      div {
+        background: #7E827A;
+        color: #DEE5D7;
+      }
+    }
     div {
       border-radius: 2px;
-      background: rgba(120, 120, 120, 0.6);
       height: 26px;
       position: absolute;
       top: 2px;
-      color: #fff;
       text-align: center;
       line-height: 26px;
-      font-family: Menlo;
+      font-family: segoe;
       font-size: 12px;
       white-space: pre;
       text-overflow: ellipsis;
       overflow: hidden;
-      &:hover {
-        background: rgba(150, 150, 150, 0.6);
+      &.selected {
+        border: 2px solid #2F343B;
+        height: 22px;
+        line-height: 22px;
+      }
+      &.hover {
+        cursor: pointer;
+      }
+      &.change {
+        opacity: 0.8;
       }
       &.move {
         cursor: move;

@@ -42,14 +42,17 @@ class Timeline
   setTime: (e) ->
     @time = @screenToValue e.offsetX
     @redrawCurrentTime()
+    no
 
   startMoving: (e) ->
+    @root.addClass "move"
     $(document.body).bind "mouseup.move", (e) => @stopMoving e
     @root.bind "mousemove.move", (e) => @doMove e
     @moveStartX = e.clientX
     @moveStartPos = @position
 
   stopMoving: (e) ->
+    @root.removeClass "move"
     $(document.body).unbind ".move"
     @root.unbind ".move"
     @root.bind "mousedown.move", (e) => @startMoving e
@@ -60,22 +63,28 @@ class Timeline
     @redraw()
 
   startMovingItem: (item, e) ->
-    @moveStartX = e.clientX
-    @moveStartSize = item.data "size"
-    @moveStartPos = item.data "position"
-    $(document.body).bind "mouseup.moveitem", (e) => @stopMovingItem item, e
-    if e.offsetX < 10
-      @root.bind "mousemove.moveitem", (e) => @doWResizeItem item, e
-    else if item.outerWidth() - e.offsetX < 10
-      @root.bind "mousemove.moveitem", (e) => @doEResizeItem item, e
+    if item.hasClass "selected"
+      @moveStartX = e.clientX
+      @moveStartSize = item.data "size"
+      @moveStartPos = item.data "position"
+      $(document.body).bind "mouseup.moveitem", (e) => @stopMovingItem item, e
+      item.addClass "change"
+      if e.offsetX < 10
+        @root.bind "mousemove.moveitem", (e) => @doWResizeItem item, e
+      else if item.outerWidth() - e.offsetX < 10
+        @root.bind "mousemove.moveitem", (e) => @doEResizeItem item, e
+      else
+        @root.bind "mousemove.moveitem", (e) => @doMoveItem item, e
     else
-      @root.bind "mousemove.moveitem", (e) => @doMoveItem item, e
+      @root.find(".row > div").removeClass "selected"
+      item.addClass "selected"
+      @redraw()
     no
 
   stopMovingItem: (item, e) ->
     @root.unbind ".moveitem"
     $(document.body).unbind ".moveitem"
-    item.removeClass "move"
+    item.removeClass "change"
 
   trySetItemAttrs: (item, {size, position, siblings}) ->
     left = position or item.data("position")
@@ -128,12 +137,16 @@ class Timeline
     item
 
   setItemCursor: (item, e) ->
-    if e.offsetX < 10
-      item.attr "class", "w-resize"
-    else if item.outerWidth() - e.offsetX < 10
-      item.attr "class", "e-resize"
+    item.removeClass("w-resize").removeClass("e-resize").removeClass("move").removeClass("hover")
+    if item.hasClass "selected"
+      if e.offsetX < 10
+        item.addClass "w-resize"
+      else if item.outerWidth() - e.offsetX < 10
+        item.addClass "e-resize"
+      else
+        item.addClass "move"
     else
-      item.attr "class", "move"
+      item.addClass "hover"
 
   redraw: ->
     for item in @root.find ".row div"
@@ -145,7 +158,7 @@ class Timeline
     @current.css
       left: Math.floor (@time - @position) * @markStep / @scale - 1
       width: if @scale is 1 then @markStep else 1
-      opacity: if @scale is 1 then 0.3 else 1
+      opacity: if @scale is 1 then 0.5 else 1
 
   valueToScreen: (val) -> Math.floor (val - @position) * @markStep / @scale
 
@@ -153,7 +166,7 @@ class Timeline
 
   redrawItem: (item) ->
     item.css
-      "width": Math.floor item.data("size") * @markStep / @scale
+      "width": Math.floor item.data("size") * @markStep / @scale - (if @scale is 1 then 1 else 0) - (if item.hasClass "selected" then 4 else 0)
       "left": @valueToScreen item.data("position")
 
   redrawMarks: ->
