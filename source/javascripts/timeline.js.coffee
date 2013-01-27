@@ -3,22 +3,73 @@ Function::getter = (prop, get) ->
   Object.defineProperty @prototype, prop, {get, configurable: yes}
 
 
-class Timeline
+Function::registerEvent = (name) ->
+  @prototype["_handlers_#{name}"] = []
+  capitalized = name.slice(0, 1).toUpperCase() + name.slice(1)
+
+  @prototype["on#{capitalized}"] = (handler) ->
+    @["_handlers_#{name}"].push handler
+    null
+
+  @prototype["dispatch#{capitalized}"] = (args...) ->
+    for handler in @["_handlers_#{name}"]
+      handler(args...)
+    null
+
+
+$ = jQuery
+
+class window.Timeline
 
   position: 0
   size: 100
   time: 0
   items: {}
+  selected: null
+  nextItemId: 0
+
+  @registerEvent "play"
+  @registerEvent "pause"
+  @registerEvent "setTime"
+  @registerEvent "itemAdded"
+  @registerEvent "itemDeleted"
+  @registerEvent "itemChanged"
 
   constructor: ->
     @root = $ "<div class='timeline'></div>"
+    @controls = $ "<div class='controls'></div>"
+    @controls.mousedown -> no
     @times = $ "<div class='times'></div>"
     @times_handle = $ "<div class='times-handle'></div>"
     @current = $ "<div class='current'></div>"
-    @root.append @times, @current, @times_handle
+    @root.append @controls, @times, @current, @times_handle
     @root.bind "mousedown.move", (e) => @startMoving e
     @root.bind "mousewheel.scale", (e) => @doScale e
     @times_handle.bind "mousedown.settime", (e) => @setTime e
+    @createControls()
+
+  createControls: ->
+    @splitBtn = $ "<div class='split disabled'>split</div>"
+    @splitBtn.click (e) =>
+      @splitControlClick e unless @splitBtn.hasClass "disabled"
+    @deleteBtn = $ "<div class='delete disabled'>delete</div>"
+    @deleteBtn.click (e) =>
+      @deleteControlClick e unless @deleteBtn.hasClass "disabled"
+    @playBtn = $ "<div class='play'>play</div>"
+    @playBtn.click (e) =>
+      if @playBtn.text() == "play"
+        @playBtn.text "pause"
+      else
+        @playBtn.text "play"
+    @controls.append @playBtn, @splitBtn, @deleteBtn
+
+  enableControls: (names...) ->
+    for name in names
+      @controls.find(".#{name}").removeClass "disabled"
+
+  disableControls: (names...) ->
+    for name in names
+      @controls.find(".#{name}").addClass "disabled"
 
   formatTime: (val) ->
     minutes = Math.floor val / (25 * 60)
@@ -42,7 +93,20 @@ class Timeline
   setTime: (e) ->
     @time = @screenToValue e.offsetX
     @redrawCurrentTime()
+    @checkSplitPosibility()
+    @dispatchSetTime @time
     no
+
+  checkSplitPosibility: ->
+    unless @selected
+      @disableControls "split"
+      return
+    position = @selected.data "position"
+    size = @selected.data "size"
+    if @time - position >= 5 and position + size - @time >= 5
+      @enableControls "split"
+    else
+      @disableControls "split"
 
   startMoving: (e) ->
     @root.addClass "move"
@@ -50,6 +114,11 @@ class Timeline
     @root.bind "mousemove.move", (e) => @doMove e
     @moveStartX = e.clientX
     @moveStartPos = @position
+    @selected?.removeClass "selected"
+    if @selected
+      @redrawItem @selected
+      @selected = null
+      @disableControls "split", "delete"
 
   stopMoving: (e) ->
     @root.removeClass "move"
@@ -76,7 +145,10 @@ class Timeline
       else
         @root.bind "mousemove.moveitem", (e) => @doMoveItem item, e
     else
-      @root.find(".row > div").removeClass "selected"
+      @selected?.removeClass "selected"
+      @selected = item
+      @enableControls "delete"
+      @checkSplitPosibility()
       item.addClass "selected"
       @redraw()
     no
@@ -87,6 +159,7 @@ class Timeline
     item.removeClass "change"
 
   trySetItemAttrs: (item, {size, position, siblings}) ->
+    return no if size < 5
     left = position or item.data("position")
     right = (size or item.data("size")) + left
     for sibling in (siblings or item.siblings())
@@ -96,7 +169,10 @@ class Timeline
     item.data
       position: position or item.data("position")
       size: size or item.data("size")
-    @redraw()
+    @dispatchItemChanged item.data("id"), item.data("position"), item.data("size")
+    @checkSplitPosibility()
+    @redrawItem item
+    yes
 
   doMoveItem: (item, e) ->
     @trySetItemAttrs item,
@@ -122,18 +198,46 @@ class Timeline
     @redraw()
     no
 
+  splitControlClick: ->
+    if @selected
+      item = @selected
+      @selected = null
+      item.removeClass "selected"
+      position = item.data "position"
+      size = item.data "size"
+      first_size = @time - position
+      if @trySetItemAttrs(item, size: first_size)
+        item.removeClass "selected"
+        second_position = @time
+        second_size = size - first_size
+        @addItem item.data("type"), second_position, second_size, item.data("name"), item.data("props")
+    @disableControls "split"
+
+  deleteControlClick: ->
+    if @selected
+      id = @selected.data "id"
+      @selected.remove()
+      @selected = null
+      @dispatchItemDeleted id
+      @redraw()
+    @disableControls "delete", "split"
+
   addItem: (type, position, size, name) ->
     row = if type is "video" then @nextVideoRow() else @nextAudioRow()
-    row.append @createItem(position, size, name)
+    row.append @createItem(type, position, size, name)
     @redraw()
 
-  createItem: (position, size, name) ->
+  createItem: (type, position, size, name, props={}) ->
     item = $ "<div>#{name}</div>"
+    item.data "type", type
     item.data "name", name
     item.data "position", position
     item.data "size", size
+    item.data "props", props
+    item.data "id", ++@nextItemId
     item.bind "mousedown.move", (e) => @startMovingItem item, e
     item.bind "mousemove.cursor", (e) => @setItemCursor item, e
+    @dispatchItemAdded item.data("id"), item.data("position"), item.data("size"), item.data("props")
     item
 
   setItemCursor: (item, e) ->
@@ -213,3 +317,4 @@ jQuery ->
   t.addItem "audio", 8, 40, "audio1"
   t.addItem "audio", 61, 20, "audio2"
   t.addItem "audio", 61, 20, "audio3"
+  window.t = t
