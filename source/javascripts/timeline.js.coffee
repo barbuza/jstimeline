@@ -27,6 +27,7 @@ class window.Timeline
   items: {}
   selected: null
   nextItemId: 0
+  playing: no
 
   @registerEvent "play"
   @registerEvent "pause"
@@ -49,18 +50,31 @@ class window.Timeline
     @createControls()
 
   createControls: ->
+
     @splitBtn = $ "<div class='split disabled'>split</div>"
     @splitBtn.click (e) =>
       @splitControlClick e unless @splitBtn.hasClass "disabled"
+
     @deleteBtn = $ "<div class='delete disabled'>delete</div>"
     @deleteBtn.click (e) =>
       @deleteControlClick e unless @deleteBtn.hasClass "disabled"
+
     @playBtn = $ "<div class='play'>play</div>"
     @playBtn.click (e) =>
-      if @playBtn.text() == "play"
-        @playBtn.text "pause"
-      else
+      if @playing
         @playBtn.text "play"
+        @dispatchPause()
+      else
+        @playBtn.text "pause"
+        @dispatchPlay()
+        @disableControls "split", "delete"
+        if @selected
+          item = @selected
+          @selected = null
+          item.removeClass "selected"
+          @redrawItem item
+      @playing = not @playing
+
     @controls.append @playBtn, @splitBtn, @deleteBtn
 
   enableControls: (names...) ->
@@ -98,7 +112,7 @@ class window.Timeline
     no
 
   checkSplitPosibility: ->
-    unless @selected
+    if @playing or not @selected
       @disableControls "split"
       return
     position = @selected.data "position"
@@ -132,6 +146,7 @@ class window.Timeline
     @redraw()
 
   startMovingItem: (item, e) ->
+    return no if @playing
     if item.hasClass "selected"
       @moveStartX = e.clientX
       @moveStartSize = item.data "size"
@@ -169,7 +184,7 @@ class window.Timeline
     item.data
       position: position or item.data("position")
       size: size or item.data("size")
-    @dispatchItemChanged item.data("id"), item.data("position"), item.data("size")
+    @dispatchItemChanged item.data("id"), item.data("position"), item.data("size"), item.data("start")
     @checkSplitPosibility()
     @redrawItem item
     yes
@@ -210,7 +225,8 @@ class window.Timeline
         item.removeClass "selected"
         second_position = @time
         second_size = size - first_size
-        @addItem item.data("type"), second_position, second_size, item.data("name"), item.data("props")
+        second_start = item.data("start") + first_size
+        @addItem item.data("type"), second_position, second_size, second_start, item.data("name"), item.data("props")
     @disableControls "split"
 
   deleteControlClick: ->
@@ -222,22 +238,23 @@ class window.Timeline
       @redraw()
     @disableControls "delete", "split"
 
-  addItem: (type, position, size, name) ->
+  addItem: (type, position, size, start, name, props) ->
     row = if type is "video" then @nextVideoRow() else @nextAudioRow()
-    row.append @createItem(type, position, size, name)
+    row.append @createItem(type, position, size, start, name, props)
     @redraw()
 
-  createItem: (type, position, size, name, props={}) ->
+  createItem: (type, position, size, start, name, props) ->
     item = $ "<div>#{name}</div>"
     item.data "type", type
     item.data "name", name
     item.data "position", position
     item.data "size", size
+    item.data "start", start
     item.data "props", props
-    item.data "id", ++@nextItemId
+    item.data "id", "item-" + (++@nextItemId)
     item.bind "mousedown.move", (e) => @startMovingItem item, e
     item.bind "mousemove.cursor", (e) => @setItemCursor item, e
-    @dispatchItemAdded item.data("id"), item.data("position"), item.data("size"), item.data("props")
+    @dispatchItemAdded item.data("id"), position, size, start, props
     item
 
   setItemCursor: (item, e) ->
