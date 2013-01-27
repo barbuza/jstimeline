@@ -57,7 +57,9 @@ set :images_dir, 'images'
 configure :build do
   # For example, change the Compass output style for deployment
   # activate :minify_css
-
+  ignore "javascripts/test.js"
+  ignore "javascripts/jquery.js"
+  ignore "index.html"
   # Minify Javascript on build
   # activate :minify_javascript
 
